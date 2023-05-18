@@ -469,9 +469,11 @@ var schemaExamples = []schemaExample{
 			UniqueItems: true,
 			Items: (&Schema{
 				Type: "object",
-				Properties: Schemas{
-					"key1": NewFloat64Schema().NewRef(),
-				},
+				Properties: NewSchemasWithValues(
+					map[string]*SchemaRef{
+						"key1": NewFloat64Schema().NewRef(),
+					},
+				),
 			}).NewRef(),
 		},
 		Serialization: map[string]interface{}{
@@ -526,13 +528,14 @@ var schemaExamples = []schemaExample{
 			UniqueItems: true,
 			Items: (&Schema{
 				Type: "object",
-				Properties: Schemas{
-					"key1": (&Schema{
-						Type:        "array",
-						UniqueItems: true,
-						Items:       NewFloat64Schema().NewRef(),
-					}).NewRef(),
-				},
+				Properties: NewSchemasWithValues(
+					map[string]*SchemaRef{
+						"key1": (&Schema{
+							Type:        "array",
+							UniqueItems: true,
+							Items:       NewFloat64Schema().NewRef(),
+						}).NewRef(),
+					}),
 			}).NewRef(),
 		},
 		Serialization: map[string]interface{}{
@@ -659,9 +662,10 @@ var schemaExamples = []schemaExample{
 				UniqueItems: true,
 				Items: (&Schema{
 					Type: "object",
-					Properties: Schemas{
-						"key1": NewFloat64Schema().NewRef(),
-					},
+					Properties: NewSchemasWithValues(
+						map[string]*SchemaRef{
+							"key1": NewFloat64Schema().NewRef(),
+						}),
 				}).NewRef(),
 			}).NewRef(),
 		},
@@ -758,9 +762,10 @@ var schemaExamples = []schemaExample{
 		Schema: &Schema{
 			Type:     "object",
 			MaxProps: Uint64Ptr(2),
-			Properties: Schemas{
-				"numberProperty": NewFloat64Schema().NewRef(),
-			},
+			Properties: NewSchemasWithValues(
+				map[string]*SchemaRef{
+					"numberProperty": NewFloat64Schema().NewRef(),
+				}),
 		},
 		Serialization: map[string]interface{}{
 			"type":          "object",
@@ -1297,7 +1302,7 @@ components:
 	s, err := NewLoader().LoadFromData([]byte(api))
 	require.NoError(t, err)
 	require.NotNil(t, s)
-	err = s.Components.Schemas["Test"].Value.VisitJSON(data)
+	err = s.Components.Schemas.Value("Test").Value.VisitJSON(data)
 	require.NotNil(t, err)
 	require.NotEqual(t, errSchema, err)
 	require.Contains(t, err.Error(), `Error at "/ownerName": Doesn't match schema "not"`)

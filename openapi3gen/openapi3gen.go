@@ -104,10 +104,10 @@ func (g *Generator) NewSchemaRefForValue(value interface{}, schemas openapi3.Sch
 		return nil, err
 	}
 	for ref := range g.SchemaRefs {
-		if _, ok := g.componentSchemaRefs[ref.Ref]; ok && schemas != nil {
-			schemas[ref.Ref] = &openapi3.SchemaRef{
+		if _, ok := g.componentSchemaRefs[ref.Ref]; ok {
+			schemas.Set(ref.Ref, &openapi3.SchemaRef{
 				Value: ref.Value,
-			}
+			})
 		}
 		if strings.HasPrefix(ref.Ref, "#/components/schemas/") {
 			ref.Value = nil
@@ -343,7 +343,7 @@ func (g *Generator) generateWithoutSaving(parents []*theTypeInfo, t reflect.Type
 			}
 
 			// Object only if it has properties
-			if schema.Properties != nil {
+			if !schema.Properties.IsZero() {
 				schema.Type = "object"
 			}
 		}

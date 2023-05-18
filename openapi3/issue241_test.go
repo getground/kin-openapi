@@ -2,6 +2,7 @@ package openapi3_test
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"testing"
 
@@ -25,5 +26,6 @@ func TestIssue241(t *testing.T) {
 	enc.SetIndent(2)
 	err = enc.Encode(spec)
 	require.NoError(t, err)
+	fmt.Println(buf.String())
 	require.Equal(t, string(data), buf.String())
 }

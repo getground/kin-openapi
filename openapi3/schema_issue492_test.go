@@ -26,14 +26,14 @@ openapi: "3.0.1"
 	require.NoError(t, err)
 
 	// verify that the expected format works
-	err = s.Components.Schemas["Server"].Value.VisitJSON(map[string]interface{}{
+	err = s.Components.Schemas.Value("Server").Value.VisitJSON(map[string]interface{}{
 		"name": "kin-openapi",
 		"time": "2001-02-03T04:05:06.789Z",
 	})
 	require.NoError(t, err)
 
 	// verify that the issue is fixed
-	err = s.Components.Schemas["Server"].Value.VisitJSON(map[string]interface{}{
+	err = s.Components.Schemas.Value("Server").Value.VisitJSON(map[string]interface{}{
 		"name": "kin-openapi",
 		"time": "2001-02-03T04:05:06:789Z",
 	})

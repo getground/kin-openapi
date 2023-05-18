@@ -30,8 +30,8 @@ func DefaultRefNameResolver(ref string) string {
 }
 
 func schemaNames(s Schemas) []string {
-	out := make([]string, 0, len(s))
-	for i := range s {
+	out := make([]string, 0, s.Len())
+	for _, i := range s.Keys() {
 		out = append(out, i)
 	}
 	return out
@@ -56,7 +56,7 @@ func (doc *T) addSchemaToSpec(s *SchemaRef, refNameResolver RefNameResolver, par
 
 	name := refNameResolver(s.Ref)
 	if doc.Components != nil {
-		if _, ok := doc.Components.Schemas[name]; ok {
+		if _, ok := doc.Components.Schemas.Get(name); ok {
 			s.Ref = "#/components/schemas/" + name
 			return true
 		}
@@ -65,10 +65,10 @@ func (doc *T) addSchemaToSpec(s *SchemaRef, refNameResolver RefNameResolver, par
 	if doc.Components == nil {
 		doc.Components = &Components{}
 	}
-	if doc.Components.Schemas == nil {
-		doc.Components.Schemas = make(Schemas)
+	if doc.Components.Schemas.om == nil {
+		doc.Components.Schemas = NewSchemas()
 	}
-	doc.Components.Schemas[name] = s.Value.NewRef()
+	doc.Components.Schemas.Set(name, s.Value.NewRef())
 	s.Ref = "#/components/schemas/" + name
 	return true
 }
@@ -264,7 +264,7 @@ func (doc *T) derefSchema(s *Schema, refNameResolver RefNameResolver, parentIsEx
 			}
 		}
 	}
-	for _, s2 := range s.Properties {
+	for _, s2 := range s.Properties.Values() {
 		isExternal := doc.addSchemaToSpec(s2, refNameResolver, parentIsExternal)
 		if s2 != nil {
 			doc.derefSchema(s2.Value, refNameResolver, isExternal || parentIsExternal)
@@ -391,7 +391,7 @@ func (doc *T) InternalizeRefs(ctx context.Context, refNameResolver func(ref stri
 	if components := doc.Components; components != nil {
 		names := schemaNames(components.Schemas)
 		for _, name := range names {
-			schema := components.Schemas[name]
+			schema := components.Schemas.Value(name)
 			isExternal := doc.addSchemaToSpec(schema, refNameResolver, false)
 			if schema != nil {
 				schema.Ref = "" // always dereference the top level

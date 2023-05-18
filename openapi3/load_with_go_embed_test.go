@@ -30,6 +30,6 @@ func Example() {
 		panic(err)
 	}
 
-	fmt.Println(doc.Paths["/foo"].Get.Responses["200"].Value.Content["application/json"].Schema.Value.Properties["foo2"].Value.Properties["foo"].Value.Properties["bar"].Value.Type)
+	fmt.Println(doc.Paths["/foo"].Get.Responses["200"].Value.Content["application/json"].Schema.Value.Properties.Value("foo2").Value.Properties.Value("foo").Value.Properties.Value("bar").Value.Type)
 	// Output: string
 }

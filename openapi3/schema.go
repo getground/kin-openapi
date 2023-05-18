@@ -17,6 +17,7 @@ import (
 
 	"github.com/go-openapi/jsonpointer"
 	"github.com/mohae/deepcopy"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
 const (
@@ -77,13 +78,138 @@ func NewSchemaRef(ref string, value *Schema) *SchemaRef {
 	}
 }
 
-type Schemas map[string]*SchemaRef
+type Schemas struct {
+	om *orderedmap.OrderedMap[string, *SchemaRef]
+}
 
 var _ jsonpointer.JSONPointable = (*Schemas)(nil)
 
+// NewSchemas creates a new Schemas instance
+func NewSchemas() Schemas {
+	return Schemas{
+		om: orderedmap.New[string, *SchemaRef](),
+	}
+}
+
+// NewSchemasWithCapacity creates a new Schemas instance with a given capacity
+func NewSchemasWithCapacity(capacity int) Schemas {
+	return Schemas{
+		om: orderedmap.New[string, *SchemaRef](orderedmap.WithCapacity[string, *SchemaRef](capacity)),
+	}
+}
+
+// NewSchemasWithValues creates a new Schemas instance with the given values
+func NewSchemasWithValues(schemas map[string]*SchemaRef) Schemas {
+	var pairs []orderedmap.Pair[string, *SchemaRef]
+	for k, v := range schemas {
+		pairs = append(pairs, orderedmap.Pair[string, *SchemaRef]{Key: k, Value: v})
+	}
+	return NewSchemasWithPairs(pairs)
+}
+
+// NewSchemasWithPairs creates a new Schemas instance with the given pairs
+func NewSchemasWithPairs(pairs []orderedmap.Pair[string, *SchemaRef]) Schemas {
+	return Schemas{
+		om: orderedmap.New[string, *SchemaRef](orderedmap.WithInitialData(pairs...)),
+	}
+}
+
+// SchemasFromMap creates a new Schemas from a map
+func SchemasFromMap(data map[string]*SchemaRef) Schemas {
+	schemas := NewSchemasWithCapacity(len(data))
+	for k, v := range data {
+		schemas.Set(k, v)
+	}
+	return schemas
+}
+
+// AsMap returns the schemas as a map
+func (schemas *Schemas) AsMap() map[string]*SchemaRef {
+	m := make(map[string]*SchemaRef, schemas.om.Len())
+	for pair := schemas.om.Oldest(); pair != nil; pair = pair.Next() {
+		m[pair.Key] = pair.Value
+	}
+	return m
+}
+
+// MarshalJSON returns the JSON encoding of Paths.
+func (schemas Schemas) MarshalJSON() ([]byte, error) {
+	return schemas.om.MarshalJSON()
+}
+
+func (schemas Schemas) MarshalYAML() (interface{}, error) {
+	return schemas.AsMap(), nil
+}
+
+func (schemas Schemas) IsZero() bool {
+	return schemas.om.Len() == 0
+}
+
+// UnmarshalJSON sets Paths to a copy of data.
+func (schemas *Schemas) UnmarshalJSON(data []byte) error {
+	return json.Unmarshal(data, &schemas.om)
+}
+
+// Value returns the value associated with the given key or a default object
+func (s *Schemas) Value(key string) *SchemaRef {
+	if s.om == nil {
+		return nil
+	}
+	return s.om.Value(key)
+}
+
+// Get returns the value associated with the given key or nil, and a bool indicating if the key exists
+func (s *Schemas) Get(key string) (*SchemaRef, bool) {
+	return s.om.Get(key)
+}
+
+// Len returns the number of items in the map
+func (s *Schemas) Len() int {
+	return s.om.Len()
+}
+
+// Keys returns the keys of the map
+func (s *Schemas) Keys() []string {
+	keys := make([]string, 0, s.om.Len())
+	for pair := s.om.Oldest(); pair != nil; pair = pair.Next() {
+		keys = append(keys, pair.Key)
+	}
+	return keys
+}
+
+// Values returns the values of the map
+func (s *Schemas) Values() []*SchemaRef {
+	values := make([]*SchemaRef, 0, s.om.Len())
+	for pair := s.om.Oldest(); pair != nil; pair = pair.Next() {
+		values = append(values, pair.Value)
+	}
+	return values
+}
+
+// Set sets the given key to value
+func (s *Schemas) Set(key string, value *SchemaRef) {
+	s.om.Set(key, value)
+}
+
+type SchemasKV orderedmap.Pair[string, *SchemaRef]
+
+// Iter returns the iterator for the map
+func (s *Schemas) Iter() *SchemasKV {
+	if s == nil || s.om == nil {
+		return nil
+	}
+	return (*SchemasKV)(s.om.Oldest())
+}
+
+// Next returns the next iterator
+func (pair *SchemasKV) Next() *SchemasKV {
+	ompair := (*orderedmap.Pair[string, *SchemaRef])(pair)
+	return (*SchemasKV)(ompair.Next())
+}
+
 // JSONLookup implements github.com/go-openapi/jsonpointer#JSONPointable
 func (s Schemas) JSONLookup(token string) (interface{}, error) {
-	ref, ok := s[token]
+	ref, ok := s.om.Get(token)
 	if ref == nil || ok == false {
 		return nil, fmt.Errorf("object has no field %q", token)
 	}
@@ -336,7 +462,7 @@ func (schema Schema) MarshalJSON() ([]byte, error) {
 	if x := schema.Required; len(x) != 0 {
 		m["required"] = x
 	}
-	if x := schema.Properties; len(x) != 0 {
+	if x := schema.Properties; x.om.Len() != 0 {
 		m["properties"] = x
 	}
 	if x := schema.MinProps; x != 0 {
@@ -627,7 +753,7 @@ func NewArraySchema() *Schema {
 func NewObjectSchema() *Schema {
 	return &Schema{
 		Type:       TypeObject,
-		Properties: make(Schemas),
+		Properties: NewSchemas(),
 	}
 }
 
@@ -748,20 +874,20 @@ func (schema *Schema) WithProperty(name string, propertySchema *Schema) *Schema 
 
 func (schema *Schema) WithPropertyRef(name string, ref *SchemaRef) *Schema {
 	properties := schema.Properties
-	if properties == nil {
-		properties = make(Schemas)
+	if properties.om == nil {
+		properties = NewSchemas()
 		schema.Properties = properties
 	}
-	properties[name] = ref
+	properties.Set(name, ref)
 	return schema
 }
 
 func (schema *Schema) WithProperties(properties map[string]*Schema) *Schema {
-	result := make(Schemas, len(properties))
+	result := NewSchemasWithCapacity(len(properties))
 	for k, v := range properties {
-		result[k] = &SchemaRef{
+		result.Set(k, &SchemaRef{
 			Value: v,
-		}
+		})
 	}
 	schema.Properties = result
 	return schema
@@ -821,8 +947,8 @@ func (schema *Schema) IsEmpty() bool {
 	if items := schema.Items; items != nil && !items.Value.IsEmpty() {
 		return false
 	}
-	for _, s := range schema.Properties {
-		if !s.Value.IsEmpty() {
+	for pair := schema.Properties.Iter(); pair != nil; pair = pair.Next() {
+		if !pair.Value.Value.IsEmpty() {
 			return false
 		}
 	}
@@ -974,13 +1100,11 @@ func (schema *Schema) validate(ctx context.Context, stack []*Schema) error {
 		}
 	}
 
-	properties := make([]string, 0, len(schema.Properties))
-	for name := range schema.Properties {
-		properties = append(properties, name)
-	}
+	properties := make([]string, 0, schema.Properties.Len())
+	properties = append(properties, schema.Properties.Keys()...)
 	sort.Strings(properties)
 	for _, name := range properties {
-		ref := schema.Properties[name]
+		ref := schema.Properties.Value(name)
 		v := ref.Value
 		if v == nil {
 			return foundUnresolvedRef(ref.Ref)
@@ -1779,13 +1903,11 @@ func (schema *Schema) visitJSONObject(settings *schemaValidationSettings, value 
 	var me MultiError
 
 	if settings.asreq || settings.asrep {
-		properties := make([]string, 0, len(schema.Properties))
-		for propName := range schema.Properties {
-			properties = append(properties, propName)
-		}
+		properties := make([]string, 0, schema.Properties.Len())
+		properties = append(properties, schema.Properties.Keys()...)
 		sort.Strings(properties)
 		for _, propName := range properties {
-			propSchema := schema.Properties[propName]
+			propSchema := schema.Properties.Value(propName)
 			reqRO := settings.asreq && propSchema.Value.ReadOnly && !settings.readOnlyValidationDisabled
 			repWO := settings.asrep && propSchema.Value.WriteOnly && !settings.writeOnlyValidationDisabled
 
@@ -1858,8 +1980,8 @@ func (schema *Schema) visitJSONObject(settings *schemaValidationSettings, value 
 	sort.Strings(keys)
 	for _, k := range keys {
 		v := value[k]
-		if properties != nil {
-			propertyRef := properties[k]
+		if properties.om != nil {
+			propertyRef := properties.Value(k)
 			if propertyRef != nil {
 				p := propertyRef.Value
 				if p == nil {
@@ -1920,10 +2042,10 @@ func (schema *Schema) visitJSONObject(settings *schemaValidationSettings, value 
 	// "required"
 	for _, k := range schema.Required {
 		if _, ok := value[k]; !ok {
-			if s := schema.Properties[k]; s != nil && s.Value.ReadOnly && settings.asreq {
+			if s := schema.Properties.Value(k); s != nil && s.Value.ReadOnly && settings.asreq {
 				continue
 			}
-			if s := schema.Properties[k]; s != nil && s.Value.WriteOnly && settings.asrep {
+			if s := schema.Properties.Value(k); s != nil && s.Value.WriteOnly && settings.asrep {
 				continue
 			}
 			if settings.failfast {

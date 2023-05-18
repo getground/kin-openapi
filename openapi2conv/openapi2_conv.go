@@ -45,7 +45,7 @@ func ToV3(doc2 *openapi2.T) (*openapi3.T, error) {
 		}
 	}
 
-	doc3.Components.Schemas = make(map[string]*openapi3.SchemaRef)
+	doc3.Components.Schemas = openapi3.NewSchemas()
 	if parameters := doc2.Parameters; len(parameters) != 0 {
 		doc3.Components.Parameters = make(map[string]*openapi3.ParameterRef)
 		doc3.Components.RequestBodies = make(map[string]*openapi3.RequestBodyRef)
@@ -58,7 +58,7 @@ func ToV3(doc2 *openapi2.T) (*openapi3.T, error) {
 				doc3.Components.RequestBodies[k] = v3RequestBody
 			case v3SchemaMap != nil:
 				for _, v3Schema := range v3SchemaMap {
-					doc3.Components.Schemas[k] = v3Schema
+					doc3.Components.Schemas.Set(k, v3Schema)
 				}
 			default:
 				doc3.Components.Parameters[k] = v3Parameter
@@ -90,7 +90,7 @@ func ToV3(doc2 *openapi2.T) (*openapi3.T, error) {
 	}
 
 	for key, schema := range ToV3Schemas(doc2.Definitions) {
-		doc3.Components.Schemas[key] = schema
+		doc3.Components.Schemas.Set(key, schema)
 	}
 
 	if m := doc2.SecurityDefinitions; len(m) != 0 {
@@ -213,7 +213,7 @@ func ToV3Parameter(components *openapi3.Components, parameter *openapi2.Paramete
 			if _, ok := components.RequestBodies[name]; ok {
 				v3Ref := strings.Replace(ref, "#/parameters/", "#/components/requestBodies/", 1)
 				return nil, &openapi3.RequestBodyRef{Ref: v3Ref}, nil, nil
-			} else if schema, ok := components.Schemas[name]; ok {
+			} else if schema, ok := components.Schemas.Get(name); ok {
 				schemaRefMap := make(map[string]*openapi3.SchemaRef)
 				if val, ok := schema.Value.Extensions["x-formData-name"]; ok {
 					name = val.(string)
@@ -341,7 +341,7 @@ func formDataBody(bodies map[string]*openapi3.SchemaRef, reqs map[string]bool, c
 	}
 	schema := &openapi3.Schema{
 		Type:       "object",
-		Properties: ToV3Schemas(bodies),
+		Properties: openapi3.SchemasFromMap(ToV3Schemas(bodies)),
 		Required:   requireds,
 	}
 	return &openapi3.RequestBodyRef{
@@ -375,7 +375,7 @@ func onlyOneReqBodyParam(bodies []*openapi3.RequestBodyRef, formDataSchemas map[
 		for formDataName, formDataSchema := range formDataSchemas {
 			if formDataSchema.Ref != "" {
 				name := getParameterNameFromNewRef(formDataSchema.Ref)
-				if schema := components.Schemas[name]; schema != nil && schema.Value != nil {
+				if schema := components.Schemas.Value(name); schema != nil && schema.Value != nil {
 					if tempName, ok := schema.Value.Extensions["x-formData-name"]; ok {
 						name = tempName.(string)
 					}
@@ -466,8 +466,8 @@ func ToV3SchemaRef(schema *openapi3.SchemaRef) *openapi3.SchemaRef {
 	if schema.Value.Items != nil {
 		schema.Value.Items = ToV3SchemaRef(schema.Value.Items)
 	}
-	for k, v := range schema.Value.Properties {
-		schema.Value.Properties[k] = ToV3SchemaRef(v)
+	for pair := schema.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+		schema.Value.Properties.Set(pair.Key, ToV3SchemaRef(pair.Value))
 	}
 	if v := schema.Value.AdditionalProperties.Schema; v != nil {
 		schema.Value.AdditionalProperties.Schema = ToV3SchemaRef(v)
@@ -729,10 +729,11 @@ func fromV3RequestBodies(name string, requestBodyRef *openapi3.RequestBodyRef, c
 	return
 }
 
-func FromV3Schemas(schemas map[string]*openapi3.SchemaRef, components *openapi3.Components) (map[string]*openapi3.SchemaRef, map[string]*openapi2.Parameter) {
+func FromV3Schemas(schemas openapi3.Schemas, components *openapi3.Components) (map[string]*openapi3.SchemaRef, map[string]*openapi2.Parameter) {
 	v2Defs := make(map[string]*openapi3.SchemaRef)
 	v2Params := make(map[string]*openapi2.Parameter)
-	for name, schema := range schemas {
+	for pair := schemas.Iter(); pair != nil; pair = pair.Next() {
+		name, schema := pair.Key, pair.Value
 		schemaConv, parameterConv := FromV3SchemaRef(schema, components)
 		if schemaConv != nil {
 			v2Defs[name] = schemaConv
@@ -749,7 +750,7 @@ func FromV3Schemas(schemas map[string]*openapi3.SchemaRef, components *openapi3.
 func FromV3SchemaRef(schema *openapi3.SchemaRef, components *openapi3.Components) (*openapi3.SchemaRef, *openapi2.Parameter) {
 	if ref := schema.Ref; ref != "" {
 		name := getParameterNameFromNewRef(ref)
-		if val, ok := components.Schemas[name]; ok {
+		if val, ok := components.Schemas.Get(name); ok {
 			if val.Value.Format == "binary" {
 				v2Ref := strings.Replace(ref, "#/components/schemas/", "#/parameters/", 1)
 				return nil, &openapi2.Parameter{Ref: v2Ref}
@@ -802,13 +803,14 @@ func FromV3SchemaRef(schema *openapi3.SchemaRef, components *openapi3.Components
 	if v := schema.Value.Items; v != nil {
 		schema.Value.Items, _ = FromV3SchemaRef(v, components)
 	}
-	keys := make([]string, 0, len(schema.Value.Properties))
-	for k := range schema.Value.Properties {
-		keys = append(keys, k)
+	keys := make([]string, 0, schema.Value.Properties.Len())
+	for pair := schema.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+		keys = append(keys, pair.Key)
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
-		schema.Value.Properties[key], _ = FromV3SchemaRef(schema.Value.Properties[key], components)
+		schemaRef, _ := FromV3SchemaRef(schema.Value.Properties.Value(key), components)
+		schema.Value.Properties.Set(key, schemaRef)
 	}
 	if v := schema.Value.AdditionalProperties.Schema; v != nil {
 		schema.Value.AdditionalProperties.Schema, _ = FromV3SchemaRef(v, components)
@@ -872,7 +874,8 @@ nameSearch:
 
 func FromV3RequestBodyFormData(mediaType *openapi3.MediaType) openapi2.Parameters {
 	parameters := openapi2.Parameters{}
-	for propName, schemaRef := range mediaType.Schema.Value.Properties {
+	for pair := mediaType.Schema.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+		propName, schemaRef := pair.Key, pair.Value
 		if ref := schemaRef.Ref; ref != "" {
 			v2Ref := strings.Replace(ref, "#/components/schemas/", "#/parameters/", 1)
 			parameters = append(parameters, &openapi2.Parameter{Ref: v2Ref})

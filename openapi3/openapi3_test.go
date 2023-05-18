@@ -261,9 +261,12 @@ func spec() *T {
 	response := &Response{
 		Description: &responseDescription,
 	}
-	schema := &Schema{
-		Description: "Some schema",
-	}
+
+	schemas := NewSchemas()
+	schemas.Set("someSchema", &SchemaRef{
+		Value: &Schema{
+			Description: "Some schema",
+		}})
 	example := map[string]string{"name": "Some example"}
 	return &T{
 		OpenAPI: "3.0",
@@ -315,11 +318,7 @@ func spec() *T {
 					Value: response,
 				},
 			},
-			Schemas: Schemas{
-				"someSchema": {
-					Value: schema,
-				},
-			},
+			Schemas: schemas,
 			Headers: Headers{
 				"someHeader": {
 					Ref: "#/components/headers/otherHeader",

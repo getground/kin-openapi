@@ -52,5 +52,5 @@ func TestParsingDiscriminator(t *testing.T) {
 	err = doc.Validate(loader.Context)
 	require.NoError(t, err)
 
-	require.Equal(t, 2, len(doc.Components.Schemas["MyResponseType"].Value.Discriminator.Mapping))
+	require.Equal(t, 2, len(doc.Components.Schemas.Value("MyResponseType").Value.Discriminator.Mapping))
 }

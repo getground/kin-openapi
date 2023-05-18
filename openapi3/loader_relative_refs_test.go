@@ -26,8 +26,8 @@ var refTestDataEntries = []refTestDataEntry{
 		name:            "SchemaRef",
 		contentTemplate: externalSchemaRefTemplate,
 		testFunc: func(t *testing.T, doc *T) {
-			require.NotNil(t, doc.Components.Schemas["TestSchema"].Value.Type)
-			require.Equal(t, "string", doc.Components.Schemas["TestSchema"].Value.Type)
+			require.NotNil(t, doc.Components.Schemas.Value("TestSchema").Value.Type)
+			require.Equal(t, "string", doc.Components.Schemas.Value("TestSchema").Value.Type)
 		},
 	},
 	{
@@ -724,8 +724,8 @@ var relativeDocRefsTestDataEntries = []refTestDataEntry{
 		name:            "SchemaRef",
 		contentTemplate: relativeSchemaDocsRefTemplate,
 		testFunc: func(t *testing.T, doc *T) {
-			require.NotNil(t, doc.Components.Schemas["TestSchema"].Value.Type)
-			require.Equal(t, "string", doc.Components.Schemas["TestSchema"].Value.Type)
+			require.NotNil(t, doc.Components.Schemas.Value("TestSchema").Value.Type)
+			require.Equal(t, "string", doc.Components.Schemas.Value("TestSchema").Value.Type)
 		},
 	},
 	{

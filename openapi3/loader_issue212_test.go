@@ -78,17 +78,17 @@ components:
 	err = doc.Validate(loader.Context)
 	require.NoError(t, err)
 
+	schema := NewSchemas()
+	schema.Set("id", &SchemaRef{Value: &Schema{Type: "string"}})
+	schema.Set("uri", &SchemaRef{Value: &Schema{Type: "string"}})
 	expected, err := json.Marshal(&Schema{
-		Type:     "object",
-		Required: []string{"id", "uri"},
-		Properties: Schemas{
-			"id":  {Value: &Schema{Type: "string"}},
-			"uri": {Value: &Schema{Type: "string"}},
-		},
+		Type:       "object",
+		Required:   []string{"id", "uri"},
+		Properties: schema,
 	},
 	)
 	require.NoError(t, err)
-	got, err := json.Marshal(doc.Components.Schemas["AvailableProduct"].Value.Properties["media"].Value.Properties["documents"].Value.Items.Value.AllOf[0].Value)
+	got, err := json.Marshal(doc.Components.Schemas.Value("AvailableProduct").Value.Properties.Value("media").Value.Properties.Value("documents").Value.Items.Value.AllOf[0].Value)
 	require.NoError(t, err)
 
 	require.Equal(t, expected, got)

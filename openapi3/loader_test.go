@@ -59,7 +59,7 @@ paths:
 	doc, err := loader.LoadFromData(spec)
 	require.NoError(t, err)
 	require.Equal(t, "An API", doc.Info.Title)
-	require.Equal(t, 2, len(doc.Components.Schemas))
+	require.Equal(t, 2, doc.Components.Schemas.Len())
 	require.Equal(t, 1, len(doc.Paths))
 	require.Equal(t, "unexpected error", *doc.Paths["/items"].Put.Responses.Default().Value.Description)
 
@@ -120,7 +120,7 @@ func TestResolveSchemaRef(t *testing.T) {
 	err = doc.Validate(loader.Context)
 	require.NoError(t, err)
 
-	refAVisited := doc.Components.Schemas["A"].Value.AllOf[0]
+	refAVisited := doc.Components.Schemas.Value("A").Value.AllOf[0]
 	require.Equal(t, "#/components/schemas/B", refAVisited.Ref)
 	require.NotNil(t, refAVisited.Value)
 }
@@ -275,7 +275,7 @@ func TestLoadFromRemoteURL(t *testing.T) {
 	doc, err := loader.LoadFromURI(url)
 	require.NoError(t, err)
 
-	require.Equal(t, "string", doc.Components.Schemas["TestSchema"].Value.Type)
+	require.Equal(t, "string", doc.Components.Schemas.Value("TestSchema").Value.Type)
 }
 
 func TestLoadWithReferenceInReference(t *testing.T) {
@@ -286,7 +286,7 @@ func TestLoadWithReferenceInReference(t *testing.T) {
 	require.NotNil(t, doc)
 	err = doc.Validate(loader.Context)
 	require.NoError(t, err)
-	require.Equal(t, "string", doc.Paths["/api/test/ref/in/ref"].Post.RequestBody.Value.Content["application/json"].Schema.Value.Properties["definition_reference"].Value.Type)
+	require.Equal(t, "string", doc.Paths["/api/test/ref/in/ref"].Post.RequestBody.Value.Content["application/json"].Schema.Value.Properties.Value("definition_reference").Value.Type)
 }
 
 func TestLoadWithRecursiveReferenceInLocalReferenceInParentSubdir(t *testing.T) {
@@ -297,7 +297,7 @@ func TestLoadWithRecursiveReferenceInLocalReferenceInParentSubdir(t *testing.T) 
 	require.NotNil(t, doc)
 	err = doc.Validate(loader.Context)
 	require.NoError(t, err)
-	require.Equal(t, "object", doc.Paths["/api/test/ref/in/ref"].Post.RequestBody.Value.Content["application/json"].Schema.Value.Properties["definition_reference"].Value.Type)
+	require.Equal(t, "object", doc.Paths["/api/test/ref/in/ref"].Post.RequestBody.Value.Content["application/json"].Schema.Value.Properties.Value("definition_reference").Value.Type)
 }
 
 func TestLoadWithRecursiveReferenceInRefrerenceInLocalReference(t *testing.T) {
@@ -308,8 +308,8 @@ func TestLoadWithRecursiveReferenceInRefrerenceInLocalReference(t *testing.T) {
 	require.NotNil(t, doc)
 	err = doc.Validate(loader.Context)
 	require.NoError(t, err)
-	require.Equal(t, "integer", doc.Paths["/api/test/ref/in/ref"].Post.RequestBody.Value.Content["application/json"].Schema.Value.Properties["data"].Value.Properties["definition_reference"].Value.Properties["ref_prop_part"].Value.Properties["idPart"].Value.Type)
-	require.Equal(t, "int64", doc.Paths["/api/test/ref/in/ref"].Post.RequestBody.Value.Content["application/json"].Schema.Value.Properties["data"].Value.Properties["definition_reference"].Value.Properties["ref_prop_part"].Value.Properties["idPart"].Value.Format)
+	require.Equal(t, "integer", doc.Paths["/api/test/ref/in/ref"].Post.RequestBody.Value.Content["application/json"].Schema.Value.Properties.Value("data").Value.Properties.Value("definition_reference").Value.Properties.Value("ref_prop_part").Value.Properties.Value("idPart").Value.Type)
+	require.Equal(t, "int64", doc.Paths["/api/test/ref/in/ref"].Post.RequestBody.Value.Content["application/json"].Schema.Value.Properties.Value("data").Value.Properties.Value("definition_reference").Value.Properties.Value("ref_prop_part").Value.Properties.Value("idPart").Value.Format)
 }
 
 func TestLoadWithReferenceInReferenceInProperty(t *testing.T) {
@@ -320,7 +320,7 @@ func TestLoadWithReferenceInReferenceInProperty(t *testing.T) {
 	require.NotNil(t, doc)
 	err = doc.Validate(loader.Context)
 	require.NoError(t, err)
-	require.Equal(t, "Problem details", doc.Paths["/api/test/ref/in/ref/in/property"].Post.Responses["401"].Value.Content["application/json"].Schema.Value.Properties["error"].Value.Title)
+	require.Equal(t, "Problem details", doc.Paths["/api/test/ref/in/ref/in/property"].Post.Responses["401"].Value.Content["application/json"].Schema.Value.Properties.Value("error").Value.Title)
 }
 
 func TestLoadFileWithExternalSchemaRef(t *testing.T) {
@@ -328,7 +328,7 @@ func TestLoadFileWithExternalSchemaRef(t *testing.T) {
 	loader.IsExternalRefsAllowed = true
 	doc, err := loader.LoadFromFile("testdata/testref.openapi.json")
 	require.NoError(t, err)
-	require.NotNil(t, doc.Components.Schemas["AnotherTestSchema"].Value.Type)
+	require.NotNil(t, doc.Components.Schemas.Value("AnotherTestSchema").Value.Type)
 }
 
 func TestLoadFileWithExternalSchemaRefSingleComponent(t *testing.T) {
@@ -438,7 +438,7 @@ func TestLoadYamlFileWithExternalSchemaRef(t *testing.T) {
 	doc, err := loader.LoadFromFile("testdata/testref.openapi.yml")
 	require.NoError(t, err)
 
-	require.NotNil(t, doc.Components.Schemas["AnotherTestSchema"].Value.Type)
+	require.NotNil(t, doc.Components.Schemas.Value("AnotherTestSchema").Value.Type)
 }
 
 func TestLoadYamlFileWithExternalPathRef(t *testing.T) {

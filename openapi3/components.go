@@ -34,7 +34,7 @@ func (components Components) MarshalJSON() ([]byte, error) {
 	for k, v := range components.Extensions {
 		m[k] = v
 	}
-	if x := components.Schemas; len(x) != 0 {
+	if x := components.Schemas; x.Len() != 0 {
 		m["schemas"] = x
 	}
 	if x := components.Parameters; len(x) != 0 {
@@ -89,13 +89,13 @@ func (components *Components) UnmarshalJSON(data []byte) error {
 func (components *Components) Validate(ctx context.Context, opts ...ValidationOption) (err error) {
 	ctx = WithValidationOptions(ctx, opts...)
 
-	schemas := make([]string, 0, len(components.Schemas))
-	for name := range components.Schemas {
-		schemas = append(schemas, name)
+	schemas := make([]string, 0, components.Schemas.Len())
+	for pair := components.Schemas.Iter(); pair != nil; pair = pair.Next() {
+		schemas = append(schemas, pair.Key)
 	}
 	sort.Strings(schemas)
 	for _, k := range schemas {
-		v := components.Schemas[k]
+		v := components.Schemas.Value(k)
 		if err = ValidateIdentifier(k); err != nil {
 			return fmt.Errorf("schema %q: %w", k, err)
 		}

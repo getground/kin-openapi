@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3gen"
 )
 
@@ -36,7 +37,7 @@ type (
 )
 
 func Example() {
-	schemaRef, err := openapi3gen.NewSchemaRefForValue(&SomeStruct{}, nil)
+	schemaRef, err := openapi3gen.NewSchemaRefForValue(&SomeStruct{}, openapi3.NewSchemas())
 	if err != nil {
 		panic(err)
 	}

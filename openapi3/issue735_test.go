@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
 type testCase struct {
@@ -178,7 +179,10 @@ func TestIssue735(t *testing.T) {
 			name: "required properties",
 			schema: &Schema{
 				Properties: Schemas{
-					"bar": NewStringSchema().NewRef(),
+					om: orderedmap.New[string, *SchemaRef](orderedmap.WithInitialData[string, *SchemaRef](orderedmap.Pair[string, *SchemaRef]{
+						Key:   "bar",
+						Value: NewStringSchema().NewRef(),
+					})),
 				},
 				Required: []string{"bar"},
 			},

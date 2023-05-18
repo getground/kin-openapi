@@ -30,14 +30,14 @@ func TestDecodeParameter(t *testing.T) {
 			return &openapi3.SchemaRef{Value: &openapi3.Schema{Type: "array", Items: items}}
 		}
 		objectOf = func(args ...interface{}) *openapi3.SchemaRef {
-			s := &openapi3.SchemaRef{Value: &openapi3.Schema{Type: "object", Properties: make(map[string]*openapi3.SchemaRef)}}
+			s := &openapi3.SchemaRef{Value: &openapi3.Schema{Type: "object", Properties: openapi3.NewSchemas()}}
 			if len(args)%2 != 0 {
 				panic("invalid arguments. must be an even number of arguments")
 			}
 			for i := 0; i < len(args)/2; i++ {
 				propName := args[i*2].(string)
 				propSchema := args[i*2+1].(*openapi3.SchemaRef)
-				s.Value.Properties[propName] = propSchema
+				s.Value.Properties.Set(propName, propSchema)
 			}
 			return s
 		}

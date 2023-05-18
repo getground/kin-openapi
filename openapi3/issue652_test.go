@@ -20,9 +20,9 @@ func TestIssue652(t *testing.T) {
 
 		spec, err := loader.LoadFromFile("testdata/issue652/nested/schema.yml")
 		require.NoError(t, err)
-		require.Contains(t, spec.Components.Schemas, schemaName)
+		require.Contains(t, spec.Components.Schemas.AsMap(), schemaName)
 
-		schema := spec.Components.Schemas[schemaName]
+		schema := spec.Components.Schemas.Value(schemaName)
 		assert.Equal(t, schema.Ref, "../definitions.yml#/components/schemas/TestSchema")
 		assert.Equal(t, schema.Value.Type, "string")
 	})

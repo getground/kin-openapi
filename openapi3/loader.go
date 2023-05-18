@@ -213,7 +213,7 @@ func (loader *Loader) ResolveRefsIn(doc *T, location *url.URL) (err error) {
 				return
 			}
 		}
-		for _, component := range components.Schemas {
+		for _, component := range components.Schemas.Values() {
 			if err = loader.resolveSchemaRef(doc, component, location, []string{}); err != nil {
 				return
 			}
@@ -396,6 +396,10 @@ func drillIntoField(cursor interface{}, fieldName string) (interface{}, error) {
 			return *ap, nil
 		}
 		return s.Value.AdditionalProperties.Schema, nil
+	}
+	// Special case due to ordered map
+	if s, ok := cursor.(Schemas); ok {
+		return drillIntoField(s.AsMap(), fieldName)
 	}
 
 	switch val := reflect.Indirect(reflect.ValueOf(cursor)); val.Kind() {
@@ -767,7 +771,7 @@ func (loader *Loader) resolveSchemaRef(doc *T, component *SchemaRef, documentPat
 			return err
 		}
 	}
-	for _, v := range value.Properties {
+	for _, v := range value.Properties.Values() {
 		if err := loader.resolveSchemaRef(doc, v, documentPath, visited); err != nil {
 			return err
 		}

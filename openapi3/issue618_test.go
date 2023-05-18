@@ -33,7 +33,7 @@ paths:
 
 	doc.InternalizeRefs(ctx, nil)
 
-	require.Contains(t, doc.Components.Schemas, "JournalEntry")
-	require.Contains(t, doc.Components.Schemas, "Record")
-	require.Contains(t, doc.Components.Schemas, "Account")
+	require.Contains(t, doc.Components.Schemas.AsMap(), "JournalEntry")
+	require.Contains(t, doc.Components.Schemas.AsMap(), "Record")
+	require.Contains(t, doc.Components.Schemas.AsMap(), "Account")
 }

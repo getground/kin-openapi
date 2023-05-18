@@ -83,7 +83,7 @@ var oneofNoDiscriminatorSpec = []byte(`components:
 func TestVisitJSON_OneOf_MissingDiscriptorProperty(t *testing.T) {
 	s, err := NewLoader().LoadFromData(oneofSpec)
 	require.NoError(t, err)
-	err = s.Components.Schemas["Animal"].Value.VisitJSON(map[string]interface{}{
+	err = s.Components.Schemas.Value("Animal").Value.VisitJSON(map[string]interface{}{
 		"name": "snoopy",
 	})
 	require.ErrorContains(t, err, "input does not contain the discriminator property \"$type\"\n")
@@ -92,7 +92,7 @@ func TestVisitJSON_OneOf_MissingDiscriptorProperty(t *testing.T) {
 func TestVisitJSON_OneOf_MissingDiscriptorValue(t *testing.T) {
 	s, err := NewLoader().LoadFromData(oneofSpec)
 	require.NoError(t, err)
-	err = s.Components.Schemas["Animal"].Value.VisitJSON(map[string]interface{}{
+	err = s.Components.Schemas.Value("Animal").Value.VisitJSON(map[string]interface{}{
 		"name":  "snoopy",
 		"$type": "snake",
 	})
@@ -102,7 +102,7 @@ func TestVisitJSON_OneOf_MissingDiscriptorValue(t *testing.T) {
 func TestVisitJSON_OneOf_MissingField(t *testing.T) {
 	s, err := NewLoader().LoadFromData(oneofSpec)
 	require.NoError(t, err)
-	err = s.Components.Schemas["Animal"].Value.VisitJSON(map[string]interface{}{
+	err = s.Components.Schemas.Value("Animal").Value.VisitJSON(map[string]interface{}{
 		"name":  "snoopy",
 		"$type": "dog",
 	})
@@ -112,7 +112,7 @@ func TestVisitJSON_OneOf_MissingField(t *testing.T) {
 func TestVisitJSON_OneOf_NoDiscriptor_MissingField(t *testing.T) {
 	s, err := NewLoader().LoadFromData(oneofNoDiscriminatorSpec)
 	require.NoError(t, err)
-	err = s.Components.Schemas["Animal"].Value.VisitJSON(map[string]interface{}{
+	err = s.Components.Schemas.Value("Animal").Value.VisitJSON(map[string]interface{}{
 		"name": "snoopy",
 	})
 	require.EqualError(t, err, "doesn't match schema due to: Error at \"/scratches\": property \"scratches\" is missing\nSchema:\n  {\n    \"properties\": {\n      \"name\": {\n        \"type\": \"string\"\n      },\n      \"scratches\": {\n        \"type\": \"boolean\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"scratches\"\n    ],\n    \"type\": \"object\"\n  }\n\nValue:\n  {\n    \"name\": \"snoopy\"\n  }\n Or Error at \"/barks\": property \"barks\" is missing\nSchema:\n  {\n    \"properties\": {\n      \"barks\": {\n        \"type\": \"boolean\"\n      },\n      \"name\": {\n        \"type\": \"string\"\n      }\n    },\n    \"required\": [\n      \"name\",\n      \"barks\"\n    ],\n    \"type\": \"object\"\n  }\n\nValue:\n  {\n    \"name\": \"snoopy\"\n  }\n")
@@ -121,14 +121,14 @@ func TestVisitJSON_OneOf_NoDiscriptor_MissingField(t *testing.T) {
 func TestVisitJSON_OneOf_BadDescriminatorType(t *testing.T) {
 	s, err := NewLoader().LoadFromData(oneofSpec)
 	require.NoError(t, err)
-	err = s.Components.Schemas["Animal"].Value.VisitJSON(map[string]interface{}{
+	err = s.Components.Schemas.Value("Animal").Value.VisitJSON(map[string]interface{}{
 		"name":      "snoopy",
 		"scratches": true,
 		"$type":     1,
 	})
 	require.ErrorContains(t, err, "value of discriminator property \"$type\" is not a string")
 
-	err = s.Components.Schemas["Animal"].Value.VisitJSON(map[string]interface{}{
+	err = s.Components.Schemas.Value("Animal").Value.VisitJSON(map[string]interface{}{
 		"name":  "snoopy",
 		"barks": true,
 		"$type": nil,
@@ -167,7 +167,7 @@ components:
 	doc, err := loader.LoadFromData([]byte(spc))
 	require.NoError(t, err)
 
-	err = doc.Components.Schemas["Something"].Value.VisitJSON(map[string]interface{}{
+	err = doc.Components.Schemas.Value("Something").Value.VisitJSON(map[string]interface{}{
 		"first": map[string]interface{}{
 			"second": map[string]interface{}{
 				"third": "123456789",

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/openapi3gen"
@@ -52,7 +53,7 @@ func ExampleGenerator_SchemaRefs() {
 	}
 
 	g := openapi3gen.NewGenerator()
-	schemaRef, err := g.NewSchemaRefForValue(&SomeStruct{}, nil)
+	schemaRef, err := g.NewSchemaRefForValue(&SomeStruct{}, openapi3.NewSchemas())
 	if err != nil {
 		panic(err)
 	}
@@ -140,7 +141,7 @@ func ExampleThrowErrorOnCycle() {
 		} `json:"a"`
 	}
 
-	schemas := make(openapi3.Schemas)
+	schemas := openapi3.NewSchemas()
 	schemaRef, err := openapi3gen.NewSchemaRefForValue(&CyclicType0{}, schemas, openapi3gen.ThrowErrorOnCycle())
 	if schemaRef != nil || err == nil {
 		panic(`With option ThrowErrorOnCycle, an error is returned when a schema reference cycle is found`)
@@ -148,7 +149,7 @@ func ExampleThrowErrorOnCycle() {
 	if _, ok := err.(*openapi3gen.CycleError); !ok {
 		panic(`With option ThrowErrorOnCycle, an error of type CycleError is returned`)
 	}
-	if len(schemas) != 0 {
+	if schemas.Len() != 0 {
 		panic(`No references should have been collected at this point`)
 	}
 
@@ -204,15 +205,29 @@ func TestExportedNonTagged(t *testing.T) {
 		EvenAYaml  string `yaml:"even_a_yaml"`
 	}
 
-	schemaRef, err := openapi3gen.NewSchemaRefForValue(&Bla{}, nil, openapi3gen.UseAllExportedFields())
+	expected := []orderedmap.Pair[string, *openapi3.SchemaRef]{
+		{
+			Key:   "A",
+			Value: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: "string"}},
+		},
+		{
+			Key:   "even_a_yaml",
+			Value: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: "string"}},
+		},
+		{
+			Key:   "another",
+			Value: &openapi3.SchemaRef{Value: &openapi3.Schema{Type: "string"}},
+		},
+	}
+
+	schemaRef, err := openapi3gen.NewSchemaRefForValue(&Bla{}, openapi3.NewSchemas(), openapi3gen.UseAllExportedFields())
 	require.NoError(t, err)
-	require.Equal(t, &openapi3.SchemaRef{Value: &openapi3.Schema{
-		Type: "object",
-		Properties: map[string]*openapi3.SchemaRef{
-			"A":           {Value: &openapi3.Schema{Type: "string"}},
-			"another":     {Value: &openapi3.Schema{Type: "string"}},
-			"even_a_yaml": {Value: &openapi3.Schema{Type: "string"}},
-		}}}, schemaRef)
+	require.Equal(t, len(expected), schemaRef.Value.Properties.Len())
+	index := 0
+	for pair := schemaRef.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+		require.Equal(t, expected[index].Key, pair.Key)
+		index++
+	}
 }
 
 func ExampleUseAllExportedFields() {
@@ -220,7 +235,7 @@ func ExampleUseAllExportedFields() {
 		UnsignedInt uint `json:"uint"`
 	}
 
-	schemaRef, err := openapi3gen.NewSchemaRefForValue(&UnsignedIntStruct{}, nil, openapi3gen.UseAllExportedFields())
+	schemaRef, err := openapi3gen.NewSchemaRefForValue(&UnsignedIntStruct{}, openapi3.NewSchemas(), openapi3gen.UseAllExportedFields())
 	if err != nil {
 		panic(err)
 	}
@@ -267,12 +282,12 @@ func ExampleGenerator_GenerateSchemaRef() {
 	}
 
 	var data []byte
-	if data, err = json.MarshalIndent(schemaRef.Value.Properties["Name"].Value, "", "  "); err != nil {
+	if data, err = json.MarshalIndent(schemaRef.Value.Properties.Value("Name").Value, "", "  "); err != nil {
 		panic(err)
 	}
 	fmt.Printf(`schemaRef.Value.Properties["Name"].Value: %s`, data)
 	fmt.Println()
-	if data, err = json.MarshalIndent(schemaRef.Value.Properties["ID"].Value, "", "  "); err != nil {
+	if data, err = json.MarshalIndent(schemaRef.Value.Properties.Value("ID").Value, "", "  "); err != nil {
 		panic(err)
 	}
 	fmt.Printf(`schemaRef.Value.Properties["ID"].Value: %s`, data)
@@ -309,10 +324,10 @@ func TestEmbeddedPointerStructs(t *testing.T) {
 	require.NoError(t, err)
 
 	var ok bool
-	_, ok = schemaRef.Value.Properties["Name"]
+	_, ok = schemaRef.Value.Properties.Get("Name")
 	require.Equal(t, true, ok)
 
-	_, ok = schemaRef.Value.Properties["ID"]
+	_, ok = schemaRef.Value.Properties.Get("ID")
 	require.Equal(t, true, ok)
 }
 
@@ -345,10 +360,10 @@ func TestEmbeddedPointerStructsWithSchemaCustomizer(t *testing.T) {
 	require.NoError(t, err)
 
 	var ok bool
-	_, ok = schemaRef.Value.Properties["Name"]
+	_, ok = schemaRef.Value.Properties.Get("Name")
 	require.Equal(t, true, ok)
 
-	_, ok = schemaRef.Value.Properties["ID"]
+	_, ok = schemaRef.Value.Properties.Get("ID")
 	require.Equal(t, true, ok)
 }
 
@@ -370,16 +385,16 @@ func TestCyclicReferences(t *testing.T) {
 	schemaRef, err := generator.GenerateSchemaRef(reflect.TypeOf(instance))
 	require.NoError(t, err)
 
-	require.NotNil(t, schemaRef.Value.Properties["FieldCycle"])
-	require.Equal(t, "#/components/schemas/ObjectDiff", schemaRef.Value.Properties["FieldCycle"].Ref)
+	require.NotNil(t, schemaRef.Value.Properties.Value("FieldCycle"))
+	require.Equal(t, "#/components/schemas/ObjectDiff", schemaRef.Value.Properties.Value("FieldCycle").Ref)
 
-	require.NotNil(t, schemaRef.Value.Properties["SliceCycle"])
-	require.Equal(t, "array", schemaRef.Value.Properties["SliceCycle"].Value.Type)
-	require.Equal(t, "#/components/schemas/ObjectDiff", schemaRef.Value.Properties["SliceCycle"].Value.Items.Ref)
+	require.NotNil(t, schemaRef.Value.Properties.Value("SliceCycle"))
+	require.Equal(t, "array", schemaRef.Value.Properties.Value("SliceCycle").Value.Type)
+	require.Equal(t, "#/components/schemas/ObjectDiff", schemaRef.Value.Properties.Value("SliceCycle").Value.Items.Ref)
 
-	require.NotNil(t, schemaRef.Value.Properties["MapCycle"])
-	require.Equal(t, "object", schemaRef.Value.Properties["MapCycle"].Value.Type)
-	require.Equal(t, "#/components/schemas/ObjectDiff", schemaRef.Value.Properties["MapCycle"].Value.AdditionalProperties.Schema.Ref)
+	require.NotNil(t, schemaRef.Value.Properties.Value("MapCycle"))
+	require.Equal(t, "object", schemaRef.Value.Properties.Value("MapCycle").Value.Type)
+	require.Equal(t, "#/components/schemas/ObjectDiff", schemaRef.Value.Properties.Value("MapCycle").Value.AdditionalProperties.Schema.Ref)
 }
 
 func ExampleSchemaCustomizer() {
@@ -425,7 +440,7 @@ func ExampleSchemaCustomizer() {
 		return nil
 	})
 
-	schemaRef, err := openapi3gen.NewSchemaRefForValue(&Bla{}, nil, openapi3gen.UseAllExportedFields(), customizer)
+	schemaRef, err := openapi3gen.NewSchemaRefForValue(&Bla{}, openapi3.NewSchemas(), openapi3gen.UseAllExportedFields(), customizer)
 	if err != nil {
 		panic(err)
 	}
@@ -486,7 +501,7 @@ func TestSchemaCustomizerError(t *testing.T) {
 	})
 
 	type Bla struct{}
-	_, err := openapi3gen.NewSchemaRefForValue(&Bla{}, nil, openapi3gen.UseAllExportedFields(), customizer)
+	_, err := openapi3gen.NewSchemaRefForValue(&Bla{}, openapi3.NewSchemas(), openapi3gen.UseAllExportedFields(), customizer)
 	require.EqualError(t, err, "test error")
 }
 
@@ -498,18 +513,18 @@ func TestSchemaCustomizerExcludeSchema(t *testing.T) {
 	customizer := openapi3gen.SchemaCustomizer(func(name string, ft reflect.Type, tag reflect.StructTag, schema *openapi3.Schema) error {
 		return nil
 	})
-	schema, err := openapi3gen.NewSchemaRefForValue(&Bla{}, nil, openapi3gen.UseAllExportedFields(), customizer)
+	schema, err := openapi3gen.NewSchemaRefForValue(&Bla{}, openapi3.NewSchemas(), openapi3gen.UseAllExportedFields(), customizer)
 	require.NoError(t, err)
 	require.Equal(t, &openapi3.SchemaRef{Value: &openapi3.Schema{
 		Type: "object",
-		Properties: map[string]*openapi3.SchemaRef{
+		Properties: openapi3.NewSchemasWithValues(map[string]*openapi3.SchemaRef{
 			"Str": {Value: &openapi3.Schema{Type: "string"}},
-		}}}, schema)
+		})}}, schema)
 
 	customizer = openapi3gen.SchemaCustomizer(func(name string, ft reflect.Type, tag reflect.StructTag, schema *openapi3.Schema) error {
 		return &openapi3gen.ExcludeSchemaSentinel{}
 	})
-	schema, err = openapi3gen.NewSchemaRefForValue(&Bla{}, nil, openapi3gen.UseAllExportedFields(), customizer)
+	schema, err = openapi3gen.NewSchemaRefForValue(&Bla{}, openapi3.NewSchemas(), openapi3gen.UseAllExportedFields(), customizer)
 	require.NoError(t, err)
 	require.Nil(t, schema)
 }
@@ -522,7 +537,7 @@ func ExampleNewSchemaRefForValue_recursive() {
 		Components []*RecursiveType `json:"children,omitempty"`
 	}
 
-	schemas := make(openapi3.Schemas)
+	schemas := openapi3.NewSchemas()
 	schemaRef, err := openapi3gen.NewSchemaRefForValue(&RecursiveType{}, schemas)
 	if err != nil {
 		panic(err)

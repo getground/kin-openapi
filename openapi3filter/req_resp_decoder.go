@@ -675,7 +675,7 @@ func (d *urlValuesDecoder) DecodeObject(param string, sm *openapi3.Serialization
 
 	// check the props
 	found := false
-	for propName := range schema.Value.Properties {
+	for _, propName := range schema.Value.Properties.Keys() {
 		if _, ok := props[propName]; ok {
 			found = true
 			break
@@ -852,7 +852,8 @@ func propsFromString(src, propDelim, valueDelim string) (map[string]string, erro
 // The function returns an error when an error happened while parse object's properties.
 func makeObject(props map[string]string, schema *openapi3.SchemaRef) (map[string]interface{}, error) {
 	obj := make(map[string]interface{})
-	for propName, propSchema := range schema.Value.Properties {
+	for pair := schema.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+		propName, propSchema := pair.Key, pair.Value
 		value, err := parsePrimitive(props[propName], propSchema)
 		if err != nil {
 			if v, ok := err.(*ParseError); ok {
@@ -1053,7 +1054,8 @@ func urlencodedBodyDecoder(body io.Reader, header http.Header, schema *openapi3.
 	if schema.Value.Type != "object" {
 		return nil, errors.New("unsupported schema of request body")
 	}
-	for propName, propSchema := range schema.Value.Properties {
+	for pair := schema.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+		propName, propSchema := pair.Key, pair.Value
 		switch propSchema.Value.Type {
 		case "object":
 			return nil, fmt.Errorf("unsupported schema of request body's property %q", propName)
@@ -1078,7 +1080,8 @@ func urlencodedBodyDecoder(body io.Reader, header http.Header, schema *openapi3.
 	// Make an object value from form values.
 	obj := make(map[string]interface{})
 	dec := &urlValuesDecoder{values: values}
-	for name, prop := range schema.Value.Properties {
+	for pair := schema.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+		name, prop := pair.Key, pair.Value
 		var (
 			value interface{}
 			enc   *openapi3.Encoding
@@ -1132,7 +1135,7 @@ func multipartBodyDecoder(body io.Reader, header http.Header, schema *openapi3.S
 		if len(schema.Value.AllOf) > 0 {
 			var exists bool
 			for _, sr := range schema.Value.AllOf {
-				if valueSchema, exists = sr.Value.Properties[name]; exists {
+				if valueSchema, exists = sr.Value.Properties.Get(name); exists {
 					break
 				}
 			}
@@ -1143,7 +1146,7 @@ func multipartBodyDecoder(body io.Reader, header http.Header, schema *openapi3.S
 			// If the property's schema has type "array" it is means that the form contains a few parts with the same name.
 			// Every such part has a type that is defined by an items schema in the property's schema.
 			var exists bool
-			if valueSchema, exists = schema.Value.Properties[name]; !exists {
+			if valueSchema, exists = schema.Value.Properties.Get(name); !exists {
 				if anyProperties := schema.Value.AdditionalProperties.Has; anyProperties != nil {
 					switch *anyProperties {
 					case true:
@@ -1157,7 +1160,7 @@ func multipartBodyDecoder(body io.Reader, header http.Header, schema *openapi3.S
 				if schema.Value.AdditionalProperties.Schema == nil {
 					return nil, &ParseError{Kind: KindOther, Cause: fmt.Errorf("part %s: undefined", name)}
 				}
-				if valueSchema, exists = schema.Value.AdditionalProperties.Schema.Value.Properties[name]; !exists {
+				if valueSchema, exists = schema.Value.AdditionalProperties.Schema.Value.Properties.Get(name); !exists {
 					return nil, &ParseError{Kind: KindOther, Cause: fmt.Errorf("part %s: undefined", name)}
 				}
 			}
@@ -1179,22 +1182,22 @@ func multipartBodyDecoder(body io.Reader, header http.Header, schema *openapi3.S
 	allTheProperties := make(map[string]*openapi3.SchemaRef)
 	if len(schema.Value.AllOf) > 0 {
 		for _, sr := range schema.Value.AllOf {
-			for k, v := range sr.Value.Properties {
-				allTheProperties[k] = v
+			for pair := sr.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+				allTheProperties[pair.Key] = pair.Value
 			}
 			if addProps := sr.Value.AdditionalProperties.Schema; addProps != nil {
-				for k, v := range addProps.Value.Properties {
-					allTheProperties[k] = v
+				for pair := addProps.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+					allTheProperties[pair.Key] = pair.Value
 				}
 			}
 		}
 	} else {
-		for k, v := range schema.Value.Properties {
-			allTheProperties[k] = v
+		for pair := schema.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+			allTheProperties[pair.Key] = pair.Value
 		}
 		if addProps := schema.Value.AdditionalProperties.Schema; addProps != nil {
-			for k, v := range addProps.Value.Properties {
-				allTheProperties[k] = v
+			for pair := addProps.Value.Properties.Iter(); pair != nil; pair = pair.Next() {
+				allTheProperties[pair.Key] = pair.Value
 			}
 		}
 	}

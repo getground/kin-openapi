@@ -27,25 +27,31 @@ func TestLoadCircularRefFromFile(t *testing.T) {
 	got, err := loader.LoadFromFile("testdata/circularRef/base.yml")
 	require.NoError(t, err)
 
+	innerSchema := openapi3.NewSchemas()
+	innerSchema.Set("id", &openapi3.SchemaRef{
+		Value: &openapi3.Schema{Type: "string"},
+	})
+
+	schemas := openapi3.NewSchemas()
+	schemas.Set("foo2", &openapi3.SchemaRef{
+		Ref: "other.yml#/components/schemas/Foo2", // reference to an external file
+		Value: &openapi3.Schema{
+			Properties: innerSchema,
+		},
+	})
 	foo := &openapi3.SchemaRef{
 		Value: &openapi3.Schema{
-			Properties: map[string]*openapi3.SchemaRef{
-				"foo2": {
-					Ref: "other.yml#/components/schemas/Foo2", // reference to an external file
-					Value: &openapi3.Schema{
-						Properties: map[string]*openapi3.SchemaRef{
-							"id": {
-								Value: &openapi3.Schema{Type: "string"}},
-						},
-					},
-				},
-			},
+			Properties: schemas,
 		},
 	}
-	bar := &openapi3.SchemaRef{Value: &openapi3.Schema{Properties: make(map[string]*openapi3.SchemaRef)}}
+	bar := &openapi3.SchemaRef{Value: &openapi3.Schema{Properties: openapi3.NewSchemas()}}
 	// circular reference
-	bar.Value.Properties["foo"] = &openapi3.SchemaRef{Ref: "#/components/schemas/Foo", Value: foo.Value}
-	foo.Value.Properties["bar"] = &openapi3.SchemaRef{Ref: "#/components/schemas/Bar", Value: bar.Value}
+	bar.Value.Properties.Set("foo", &openapi3.SchemaRef{Ref: "#/components/schemas/Foo", Value: foo.Value})
+	foo.Value.Properties.Set("bar", &openapi3.SchemaRef{Ref: "#/components/schemas/Bar", Value: bar.Value})
+
+	wantSchema := openapi3.NewSchemas()
+	wantSchema.Set("Foo", foo)
+	wantSchema.Set("Bar", bar)
 
 	want := &openapi3.T{
 		OpenAPI: "3.0.3",
@@ -54,10 +60,7 @@ func TestLoadCircularRefFromFile(t *testing.T) {
 			Version: "1.0",
 		},
 		Components: &openapi3.Components{
-			Schemas: openapi3.Schemas{
-				"Foo": foo,
-				"Bar": bar,
-			},
+			Schemas: wantSchema,
 		},
 	}
 
